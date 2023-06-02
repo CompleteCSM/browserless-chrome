@@ -1,10 +1,15 @@
-FROM ubuntu:kinetic
+FROM nvidia/opengl:1.2-glvnd-devel-ubuntu22.04
 
 ENV NODE_VERSION v18.12.0
 ENV NVM_DIR /usr/src/.nvm
 ENV NODE_PATH $NVM_DIR/versions/node/$NODE_VERSION/bin
 ENV PATH $NODE_PATH:$PATH
+# Env vars for the nvidia-container-runtime.
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES all
+ENV LSB_RELEASE=jammy
 
+ARG DEBIAN_FRONTEND=noninteractive
 ARG BLESS_USER_ID=999
 
 COPY fonts.conf /etc/fonts/local.conf
@@ -13,18 +18,55 @@ COPY fonts.conf /etc/fonts/local.conf
 RUN apt-get -qq update && \
   apt-get -qq dist-upgrade
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        ca-certificates \
+        build-essential \
+        g++ \
+        libxinerama-dev \
+        libxext-dev \
+        libxrandr-dev \
+        libxi-dev \
+        libxcursor-dev \
+        libxxf86vm-dev \
+        wget \
+        gnupg \
+        libvulkan-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y apt-utils && apt-get install -y curl
+
+# Install GTK, pulseaudio and fonts
+RUN apt-get update && \
+    apt-get -y --no-install-recommends install tzdata \
+                       libcanberra-gtk-module libexif12 pulseaudio attr \
+                       fonts-dejavu-core fonts-freefont-ttf fonts-guru-extra \
+                       fonts-kacst fonts-kacst-one fonts-khmeros-core fonts-lao \
+                       fonts-liberation fonts-lklug-sinhala fonts-lohit-guru \
+                       fonts-nanum fonts-opensymbol fonts-sil-abyssinica \
+                       fonts-sil-padauk fonts-symbola fonts-takao-pgothic \
+                       fonts-tibetan-machine fonts-tlwg-garuda-ttf \
+                       fonts-tlwg-kinnari-ttf fonts-tlwg-laksaman-ttf \
+                       fonts-tlwg-loma-ttf fonts-tlwg-mono-ttf \
+                       fonts-tlwg-norasi-ttf fonts-tlwg-purisa-ttf \
+                       fonts-tlwg-sawasdee-ttf fonts-tlwg-typewriter-ttf \
+                       fonts-tlwg-typist-ttf fonts-tlwg-typo-ttf \
+                       fonts-tlwg-umpush-ttf fonts-tlwg-waree-ttf \
+                       ttf-bitstream-vera \
+                       fonts-arphic-ukai fonts-arphic-uming \
+                       fonts-ipafont-mincho fonts-ipafont-gothic \
+                       fonts-unfonts-core && \
+    rm -rf -- /var/lib/apt/lists /tmp/*.deb
+
 # Add the partner repository
-RUN apt-get -y -qq install software-properties-common && \
-  apt-add-repository "deb http://archive.canonical.com/ubuntu $(lsb_release -sc) partner"
+RUN echo "deb http://archive.canonical.com/ubuntu $LSB_RELEASE partner" > /etc/apt/sources.list.d/ubuntu-partner.list \
+  && apt update
 
 # Accept Microsoft EULA agreement for ttf-mscorefonts-installer
 RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections
 
 # Install dependencies for Chrome / Chromium
 RUN apt-get -y -qq --no-install-recommends install \
-  build-essential \
-  ca-certificates \
-  curl \
   dumb-init \
   ffmpeg \
   fontconfig \
@@ -84,7 +126,6 @@ RUN apt-get -y -qq --no-install-recommends install \
   msttcorefonts \
   pdftk \
   unzip \
-  wget \
   xdg-utils \
   xvfb
 
